@@ -46,11 +46,16 @@ export default function HomePage() {
     ? Math.round(trendData.reduce((sum, d) => sum + (d.wasteRate || 0), 0) / trendData.length * 10) / 10
     : null;
 
+  // Date range label from trend data
+  const firstDate = trendData.length > 0 ? trendData[0].date : null;
+  const lastDate = trendData.length > 0 ? trendData[trendData.length - 1].date : null;
+  const trendLabel = firstDate && lastDate ? `${firstDate} – ${lastDate}` : 'last 14 days';
+
   return (
     <DashboardLayout>
       <div className="page-header">
         <h2>Dashboard</h2>
-        <p>Campus food waste at a glance — last 14 days</p>
+        <p>Campus food waste at a glance &mdash; <span style={{ color: 'var(--accent)', fontWeight: 500 }}>{trendLabel}</span></p>
       </div>
 
       <div className="page-body">
@@ -63,9 +68,10 @@ export default function HomePage() {
             {/* Stat Cards */}
             <div className="stats-grid mb-6">
               <div className="card animate-in">
-                <div className="card-title">Avg Waste Rate (14d)</div>
+                <div className="card-title">Avg Waste Rate</div>
                 <div className="card-value">{avgWasteRate !== null ? `${avgWasteRate}%` : '—%'}</div>
-                <div className="card-subtitle mt-2">
+                <div className="card-subtitle mt-2" style={{ color: 'var(--text-muted)', fontSize: 11, marginBottom: 4 }}>{trendLabel}</div>
+                <div className="card-subtitle">
                   {avgWasteRate !== null && avgWasteRate < 30 ? (
                     <span className="text-accent flex items-center gap-1"><TrendingDown size={14} /> Below 30% target</span>
                   ) : (
@@ -77,28 +83,26 @@ export default function HomePage() {
               <div className="card animate-in">
                 <div className="card-title">Total Cost Wasted</div>
                 <div className="card-value">&#8377;{roi?.total_cost_wasted?.toLocaleString() ?? '—'}</div>
-                <div className="card-subtitle mt-2 text-accent">
-                  &#8377;{roi?.total_cost_saved?.toLocaleString() ?? '—'} recoverable
-                </div>
+                <div className="card-subtitle" style={{ color: 'var(--text-muted)', fontSize: 11, marginBottom: 4 }}>all time &mdash; &#8377;{roi?.total_cost_saved?.toLocaleString() ?? '—'} recoverable</div>
               </div>
 
               <div className="card animate-in">
                 <div className="card-title">CO&#8322; Preventable</div>
                 <div className="card-value">{roi?.co2_prevented?.toLocaleString() ?? '—'} <span className="text-sm font-regular text-muted">kg</span></div>
-                <div className="card-subtitle mt-2">{roi?.water_saved?.toLocaleString() ?? '—'} L water saveable</div>
+                <div className="card-subtitle" style={{ color: 'var(--text-muted)', fontSize: 11 }}>all time &mdash; {roi?.water_saved?.toLocaleString() ?? '—'} L water</div>
               </div>
 
               <div className="card animate-in">
                 <div className="card-title">Wasted Portions</div>
                 <div className="card-value">{roi?.meals_equivalent?.toLocaleString() ?? '—'}</div>
-                <div className="card-subtitle mt-2">Overall waste: {roi?.waste_percentage ?? '—'}%</div>
+                <div className="card-subtitle" style={{ color: 'var(--text-muted)', fontSize: 11 }}>all time &mdash; overall {roi?.waste_percentage ?? '—'}% waste rate</div>
               </div>
             </div>
 
             {/* Trend Chart + Leaderboard */}
             <div className="flex gap-6 mb-6" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr' }}>
               <div className="card animate-in">
-                <div className="section-title">Waste Rate Trend (14 days)</div>
+                <div className="section-title">Waste Rate Trend &mdash; {trendLabel}</div>
                 <div className="chart-container">
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={trendData} margin={{ top: 8, right: 16, bottom: 8, left: 0 }}>
