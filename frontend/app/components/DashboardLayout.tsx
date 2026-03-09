@@ -38,7 +38,7 @@ function Sidebar() {
     <aside className="sidebar">
       <div className="sidebar-logo">
         <Leaf size={20} color="var(--accent)" />
-        <h1>ZeroWaste</h1>
+        <h1>Folia</h1>
         <span>beta</span>
       </div>
       <nav className="sidebar-nav">

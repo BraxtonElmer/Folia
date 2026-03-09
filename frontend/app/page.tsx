@@ -41,14 +41,16 @@ export default function HomePage() {
 
   if (!mounted) return <DashboardLayout><div className="page-body" /></DashboardLayout>;
 
-  const todayTrend = trendData.length > 0 ? trendData[trendData.length - 1] : null;
-  const wasteRate = todayTrend?.wasteRate ?? null;
+  // Use average waste rate over the 14-day window rather than a single day point
+  const avgWasteRate = trendData.length > 0
+    ? Math.round(trendData.reduce((sum, d) => sum + (d.wasteRate || 0), 0) / trendData.length * 10) / 10
+    : null;
 
   return (
     <DashboardLayout>
       <div className="page-header">
         <h2>Dashboard</h2>
-        <p>Real-time overview of food waste across campus</p>
+        <p>Campus food waste at a glance — last 14 days</p>
       </div>
 
       <div className="page-body">
@@ -61,35 +63,35 @@ export default function HomePage() {
             {/* Stat Cards */}
             <div className="stats-grid mb-6">
               <div className="card animate-in">
-                <div className="card-title">Today&apos;s Waste Rate</div>
-                <div className="card-value">{wasteRate !== null ? `${wasteRate}%` : '—%'}</div>
+                <div className="card-title">Avg Waste Rate (14d)</div>
+                <div className="card-value">{avgWasteRate !== null ? `${avgWasteRate}%` : '—%'}</div>
                 <div className="card-subtitle mt-2">
-                  {wasteRate !== null && wasteRate < 30 ? (
-                    <span className="text-accent flex items-center gap-1"><TrendingDown size={14} /> Below target</span>
+                  {avgWasteRate !== null && avgWasteRate < 30 ? (
+                    <span className="text-accent flex items-center gap-1"><TrendingDown size={14} /> Below 30% target</span>
                   ) : (
-                    <span className="text-danger flex items-center gap-1"><TrendingUp size={14} /> Above target</span>
+                    <span className="text-danger flex items-center gap-1"><TrendingUp size={14} /> Above 30% target</span>
                   )}
                 </div>
               </div>
 
               <div className="card animate-in">
-                <div className="card-title">Cost Wasted</div>
-                <div className="card-value">₹{roi?.total_cost_wasted?.toLocaleString() ?? '—'}</div>
+                <div className="card-title">Total Cost Wasted</div>
+                <div className="card-value">&#8377;{roi?.total_cost_wasted?.toLocaleString() ?? '—'}</div>
                 <div className="card-subtitle mt-2 text-accent">
-                  ₹{roi?.total_cost_saved?.toLocaleString() ?? '—'} saveable
+                  &#8377;{roi?.total_cost_saved?.toLocaleString() ?? '—'} recoverable
                 </div>
               </div>
 
               <div className="card animate-in">
-                <div className="card-title">CO₂ Preventable</div>
+                <div className="card-title">CO&#8322; Preventable</div>
                 <div className="card-value">{roi?.co2_prevented?.toLocaleString() ?? '—'} <span className="text-sm font-regular text-muted">kg</span></div>
-                <div className="card-subtitle mt-2">{roi?.water_saved?.toLocaleString() ?? '—'} L water saved</div>
+                <div className="card-subtitle mt-2">{roi?.water_saved?.toLocaleString() ?? '—'} L water saveable</div>
               </div>
 
               <div className="card animate-in">
-                <div className="card-title">Meals Equivalent</div>
+                <div className="card-title">Wasted Portions</div>
                 <div className="card-value">{roi?.meals_equivalent?.toLocaleString() ?? '—'}</div>
-                <div className="card-subtitle mt-2">Total wasted portions</div>
+                <div className="card-subtitle mt-2">Overall waste: {roi?.waste_percentage ?? '—'}%</div>
               </div>
             </div>
 
