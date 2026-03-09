@@ -28,27 +28,29 @@ CANTEENS = [
 # ============ FOOD ITEMS ============
 # Based on typical Indian university canteen menus
 # cost_per_portion in INR, base_demand is avg daily demand
+# overprep = how much extra staff makes beyond actual demand for that item.
+# Staples (roti, jeera rice) are well-calibrated. Premium/batch items (biryani, paneer) get over-made.
 FOOD_ITEMS = {
     "Main Canteen": [
-        {"name": "Dal Tadka", "category": "Main Course", "cost": 25, "base_demand": 85, "popularity": 0.92},
-        {"name": "Veg Biryani", "category": "Rice", "cost": 45, "base_demand": 70, "popularity": 0.85},
-        {"name": "Paneer Butter Masala", "category": "Main Course", "cost": 55, "base_demand": 60, "popularity": 0.80},
-        {"name": "Jeera Rice", "category": "Rice", "cost": 20, "base_demand": 90, "popularity": 0.95},
-        {"name": "Roti", "category": "Bread", "cost": 8, "base_demand": 150, "popularity": 0.98},
-        {"name": "Rajma Chawal", "category": "Combo", "cost": 40, "base_demand": 55, "popularity": 0.75},
-        {"name": "Chole Bhature", "category": "Combo", "cost": 40, "base_demand": 65, "popularity": 0.82},
-        {"name": "Samosa", "category": "Snack", "cost": 15, "base_demand": 100, "popularity": 0.90},
+        {"name": "Dal Tadka", "category": "Main Course", "cost": 25, "base_demand": 85, "popularity": 0.92, "overprep": 0.12},
+        {"name": "Veg Biryani", "category": "Rice", "cost": 45, "base_demand": 70, "popularity": 0.85, "overprep": 0.48},  # batch-cooked, always extra
+        {"name": "Paneer Butter Masala", "category": "Main Course", "cost": 55, "base_demand": 60, "popularity": 0.80, "overprep": 0.42},  # premium = fear of running out
+        {"name": "Jeera Rice", "category": "Rice", "cost": 20, "base_demand": 90, "popularity": 0.95, "overprep": 0.08},  # staff knows demand well
+        {"name": "Roti", "category": "Bread", "cost": 8, "base_demand": 150, "popularity": 0.98, "overprep": 0.06},   # made fresh in batches, minimal waste
+        {"name": "Rajma Chawal", "category": "Combo", "cost": 40, "base_demand": 55, "popularity": 0.75, "overprep": 0.28},
+        {"name": "Chole Bhature", "category": "Combo", "cost": 40, "base_demand": 65, "popularity": 0.82, "overprep": 0.20},
+        {"name": "Samosa", "category": "Snack", "cost": 15, "base_demand": 100, "popularity": 0.90, "overprep": 0.38},  # fried in large batches
     ],
     "North Café": [
-        {"name": "Masala Dosa", "category": "South Indian", "cost": 35, "base_demand": 50, "popularity": 0.78},
-        {"name": "Idli Sambhar", "category": "South Indian", "cost": 25, "base_demand": 45, "popularity": 0.72},
-        {"name": "Pasta Arrabiata", "category": "Continental", "cost": 50, "base_demand": 35, "popularity": 0.60},
-        {"name": "Veg Sandwich", "category": "Snack", "cost": 30, "base_demand": 55, "popularity": 0.70},
+        {"name": "Masala Dosa", "category": "South Indian", "cost": 35, "base_demand": 50, "popularity": 0.78, "overprep": 0.35},
+        {"name": "Idli Sambhar", "category": "South Indian", "cost": 25, "base_demand": 45, "popularity": 0.72, "overprep": 0.15},
+        {"name": "Pasta Arrabiata", "category": "Continental", "cost": 50, "base_demand": 35, "popularity": 0.60, "overprep": 0.50},  # niche item, always over-made
+        {"name": "Veg Sandwich", "category": "Snack", "cost": 30, "base_demand": 55, "popularity": 0.70, "overprep": 0.18},
     ],
     "South Bistro": [
-        {"name": "Veg Thali", "category": "Combo", "cost": 60, "base_demand": 40, "popularity": 0.88},
-        {"name": "Hakka Noodles", "category": "Chinese", "cost": 40, "base_demand": 50, "popularity": 0.75},
-        {"name": "Veg Manchurian", "category": "Chinese", "cost": 45, "base_demand": 40, "popularity": 0.65},
+        {"name": "Veg Thali", "category": "Combo", "cost": 60, "base_demand": 40, "popularity": 0.88, "overprep": 0.22},
+        {"name": "Hakka Noodles", "category": "Chinese", "cost": 40, "base_demand": 50, "popularity": 0.75, "overprep": 0.30},
+        {"name": "Veg Manchurian", "category": "Chinese", "cost": 45, "base_demand": 40, "popularity": 0.65, "overprep": 0.44},  # unpredictable demand
     ],
 }
 
@@ -60,9 +62,9 @@ DOW_DEMAND_MULTIPLIER = {
     1: 0.95,  # Tuesday — slight dip
     2: 1.05,  # Wednesday — usually peak
     3: 0.93,  # Thursday — some skip for outings
-    4: 0.85,  # Friday — many leave early for weekend
-    5: 0.55,  # Saturday — half students gone
-    6: 0.40,  # Sunday — minimal crowd
+    4: 0.82,  # Friday — many leave early for weekend
+    5: 0.48,  # Saturday — half students gone
+    6: 0.25,  # Sunday — minimal crowd, mostly hostel residents
 }
 
 # Weather impact on demand (based on Indian campus patterns)
@@ -82,10 +84,11 @@ EVENT_DEMAND_MULTIPLIER = {
 }
 
 # Meal-type demand fractions
+# Breakfast and dinner are much lower — students often skip breakfast or order delivery for dinner
 MEAL_FRACTION = {
-    "breakfast": 0.35,
+    "breakfast": 0.28,
     "lunch": 1.00,
-    "dinner": 0.70,
+    "dinner": 0.40,
 }
 
 # OVERPREPRATION BIAS: Canteen staff typically prepares 15-40% more than actual demand
@@ -137,14 +140,14 @@ def get_event_for_date(d: datetime) -> str:
     if (month == 11 and day in range(1, 4)):    # Diwali aftermath
         return "holiday"
     
-    # Exam weeks (typical Indian university pattern)
-    if (month == 5 and day in range(5, 20)):    # End-sem exams May
+    # Exam weeks (typical Indian university pattern — 6-7 day windows)
+    if (month == 5 and day in range(8, 16)):    # End-sem exams May
         return "exam"
-    if (month == 12 and day in range(1, 15)):   # End-sem exams Dec
+    if (month == 12 and day in range(4, 12)):   # End-sem exams Dec
         return "exam"
-    if (month == 8 and day in range(20, 31)):   # Mid-sem exams Aug
+    if (month == 8 and day in range(22, 29)):   # Mid-sem exams Aug
         return "exam"
-    if (month == 3 and day in range(1, 10)):    # Mid-sem exams Mar
+    if (month == 3 and day in range(2, 7)):     # Mid-sem exams Mar (NOT 1-10, keeps recent days normal)
         return "exam"
     
     # College fest (usually Feb or Sep)
@@ -191,14 +194,14 @@ def generate_real_world_data(days: int = 365) -> dict[str, list[dict[str, Any]]]
         # Determine meals for this day
         meals_today = ["lunch"]
         if dow < 5 and event != "holiday":  # Weekdays
-            if random.random() < 0.7:
+            if random.random() < 0.40:   # ~40% of weekdays have dinner service (many order in)
                 meals_today.append("dinner")
-            if random.random() < 0.3:
+            if random.random() < 0.22:   # only ~22% have staffed breakfast
                 meals_today.insert(0, "breakfast")
-        elif dow == 5:  # Saturday
-            if random.random() < 0.4:
+        elif dow == 5:  # Saturday — fewer students on campus
+            if random.random() < 0.20:
                 meals_today.append("dinner")
-        # Sunday / holiday — usually just lunch
+        # Sunday / holiday — lunch only, very sparse
         
         for canteen_name, items in FOOD_ITEMS.items():
             for item in items:
@@ -218,10 +221,10 @@ def generate_real_world_data(days: int = 365) -> dict[str, list[dict[str, Any]]]
                     actual_demand = max(0, actual_demand)
                     
                     # Staff overpreparation (the realistic waste source)
-                    # Staff uses gut feel + last few days as reference
-                    # They tend to overprepare by 15-35%
-                    overprep_factor = 1.0 + OVERPREP_BIAS + random.gauss(0, 0.08)
-                    overprep_factor = max(1.05, overprep_factor)  # at least 5% over
+                    # Each item has its own bias — staples are calibrated, batch/premium items are not
+                    item_overprep = item.get("overprep", OVERPREP_BIAS)
+                    overprep_factor = 1.0 + item_overprep + random.gauss(0, 0.12)
+                    overprep_factor = max(1.03, overprep_factor)  # at least 3% over
                     
                     prepared_qty = int(actual_demand * overprep_factor)
                     prepared_qty = max(10, prepared_qty)  # minimum batch size
