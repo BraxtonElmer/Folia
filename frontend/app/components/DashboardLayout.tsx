@@ -16,6 +16,7 @@ import {
   FileText,
   Leaf,
   Settings,
+  Flame,
 } from 'lucide-react';
 
 const navItems = [
@@ -27,6 +28,7 @@ const navItems = [
   { label: 'Expiry Alerts', href: '/expiry', icon: AlertTriangle, section: 'Operations' },
   { label: 'Menu Optimizer', href: '/menu', icon: Utensils, section: 'Operations' },
   { label: 'Benchmarking', href: '/benchmark', icon: Building2, section: 'Operations' },
+  { label: 'Biogas Calc', href: '/biogas', icon: Flame, section: 'Operations' },
   { label: 'Student Votes', href: '/vote', icon: Vote, section: 'Engagement' },
   { label: 'Weekly Report', href: '/report', icon: FileText, section: 'Reports' },
   { label: 'Settings', href: '/settings', icon: Settings, section: 'Admin' },
