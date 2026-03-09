@@ -5,7 +5,6 @@ const WEATHER_MULTIPLIERS: Record<WeatherTag, number> = {
   sunny: 1.0,
   rainy: 0.70,
   cold: 0.85,
-  hot: 0.90,
 };
 
 const EVENT_MULTIPLIERS: Record<EventTag, number> = {

@@ -57,7 +57,7 @@ function generateWasteLogs(): WasteLog[] {
     
     // Weather pattern — rainy on some days
     const weatherRoll = rand();
-    const weather: WeatherTag = weatherRoll < 0.15 ? 'rainy' : weatherRoll < 0.25 ? 'cold' : weatherRoll < 0.4 ? 'hot' : 'sunny';
+    const weather: WeatherTag = weatherRoll < 0.15 ? 'rainy' : weatherRoll < 0.25 ? 'cold' : 'sunny';
     
     // Event tags — exams in certain periods, fests, holidays
     let event: EventTag = 'normal';
@@ -71,7 +71,7 @@ function generateWasteLogs(): WasteLog[] {
     };
     
     const weatherMultiplier: Record<WeatherTag, number> = {
-      sunny: 1.0, rainy: 0.7, cold: 0.85, hot: 0.9
+      sunny: 1.0, rainy: 0.7, cold: 0.85
     };
     
     const eventMultiplier: Record<EventTag, number> = {

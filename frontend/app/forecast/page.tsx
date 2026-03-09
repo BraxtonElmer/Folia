@@ -9,7 +9,6 @@ const weatherOptions = [
   { value: 'sunny', label: '☀️ sunny' },
   { value: 'rainy', label: '🌧️ rainy' },
   { value: 'cold', label: '❄️ cold' },
-  { value: 'hot', label: '🔥 hot' },
 ];
 const eventOptions = [
   { value: 'normal', label: '📅 normal' },

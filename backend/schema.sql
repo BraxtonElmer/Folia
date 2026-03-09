@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS waste_logs (
   prepared_qty INTEGER NOT NULL DEFAULT 0,
   sold_qty INTEGER NOT NULL DEFAULT 0,
   leftover_qty INTEGER NOT NULL DEFAULT 0,
-  weather TEXT DEFAULT 'sunny' CHECK (weather IN ('sunny', 'rainy', 'cold', 'hot')),
+  weather TEXT DEFAULT 'sunny' CHECK (weather IN ('sunny', 'rainy', 'cold')),
   event TEXT DEFAULT 'normal' CHECK (event IN ('normal', 'exam', 'fest', 'holiday')),
   created_at TIMESTAMPTZ DEFAULT NOW()
 );

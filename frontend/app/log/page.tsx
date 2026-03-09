@@ -161,7 +161,7 @@ export default function LogPage() {
                 <div className="form-group">
                   <label className="form-label">Weather</label>
                   <div className="tag-list">
-                    {['sunny', 'rainy', 'cold', 'hot'].map(w => (
+                    {['sunny', 'rainy', 'cold'].map(w => (
                       <button type="button" key={w} className={`tag ${formWeather === w ? 'selected' : ''}`} onClick={() => setFormWeather(w)}>{w}</button>
                     ))}
                   </div>

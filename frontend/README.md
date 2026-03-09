@@ -72,7 +72,7 @@ Prophet is an open-source time-series forecasting library by Meta. Folia trains 
 1. **Training data** — All waste log records are aggregated to one row per `(item_id, log_date)`, summing quantities across meal types. This gives a clean daily demand series per item.
 
 2. **Regressors** — Six binary contextual features are added as external regressors:
-   - `is_rainy`, `is_cold`, `is_hot` — weather conditions
+   - `is_rainy`, `is_cold` — weather conditions
    - `is_exam`, `is_fest`, `is_holiday` — campus calendar events
 
 3. **Model configuration:**

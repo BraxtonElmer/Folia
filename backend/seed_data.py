@@ -72,7 +72,6 @@ WEATHER_DEMAND_MULTIPLIER = {
     "sunny": 1.00,
     "rainy": 0.68,  # Heavy rain = students order in/skip meals
     "cold": 0.82,   # Winter = slower meals
-    "hot": 0.88,    # Summer heat = reduced appetite
 }
 
 # Event impact
@@ -104,7 +103,6 @@ def get_weather_for_date(d: datetime) -> str:
     # Monsoon season (Jun-Sep) — high rain probability
     if month in (6, 7, 8, 9):
         if roll < 0.45: return "rainy"
-        if roll < 0.60: return "hot"
         return "sunny"
     # Winter (Nov-Feb)
     elif month in (11, 12, 1, 2):
@@ -113,8 +111,7 @@ def get_weather_for_date(d: datetime) -> str:
         return "sunny"
     # Summer (Mar-May)
     elif month in (3, 4, 5):
-        if roll < 0.40: return "hot"
-        if roll < 0.50: return "rainy"
+        if roll < 0.30: return "rainy"
         return "sunny"
     # October — post monsoon
     else:

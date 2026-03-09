@@ -5,7 +5,7 @@ export interface Canteen {
 }
 
 export type MealType = 'breakfast' | 'lunch' | 'dinner';
-export type WeatherTag = 'sunny' | 'rainy' | 'cold' | 'hot';
+export type WeatherTag = 'sunny' | 'rainy' | 'cold';
 export type EventTag = 'normal' | 'exam' | 'fest' | 'holiday';
 
 export interface FoodItem {

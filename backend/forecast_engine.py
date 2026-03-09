@@ -17,7 +17,7 @@ logging.getLogger('cmdstanpy').setLevel(logging.WARNING)
 warnings.filterwarnings('ignore', category=FutureWarning)
 
 # Context multiplier maps for manual adjustments
-WEATHER_MULT = {"sunny": 1.0, "rainy": 0.70, "cold": 0.85, "hot": 0.90}
+WEATHER_MULT = {"sunny": 1.0, "rainy": 0.70, "cold": 0.85}
 EVENT_MULT = {"normal": 1.0, "exam": 0.60, "fest": 1.35, "holiday": 0.30}
 DOW_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
@@ -68,7 +68,6 @@ class ForecastEngine:
             # Add regressors — binary encode weather and events
             prophet_df["is_rainy"] = (item_data["weather"].values == "rainy").astype(float)
             prophet_df["is_cold"] = (item_data["weather"].values == "cold").astype(float)
-            prophet_df["is_hot"] = (item_data["weather"].values == "hot").astype(float)
             prophet_df["is_exam"] = (item_data["event"].values == "exam").astype(float)
             prophet_df["is_fest"] = (item_data["event"].values == "fest").astype(float)
             prophet_df["is_holiday"] = (item_data["event"].values == "holiday").astype(float)
@@ -86,7 +85,6 @@ class ForecastEngine:
             # Add custom regressors
             model.add_regressor("is_rainy")
             model.add_regressor("is_cold")
-            model.add_regressor("is_hot")
             model.add_regressor("is_exam")
             model.add_regressor("is_fest")
             model.add_regressor("is_holiday")
@@ -130,7 +128,6 @@ class ForecastEngine:
             "ds": [pd.Timestamp(target_date)],
             "is_rainy": [1.0 if weather == "rainy" else 0.0],
             "is_cold": [1.0 if weather == "cold" else 0.0],
-            "is_hot": [1.0 if weather == "hot" else 0.0],
             "is_exam": [1.0 if event == "exam" else 0.0],
             "is_fest": [1.0 if event == "fest" else 0.0],
             "is_holiday": [1.0 if event == "holiday" else 0.0],
@@ -240,11 +237,11 @@ class ForecastEngine:
                 weekly_seasonality=True,
                 daily_seasonality=False,
             )
-            for reg in ["is_rainy", "is_cold", "is_hot", "is_exam", "is_fest", "is_holiday"]:
+            for reg in ["is_rainy", "is_cold", "is_exam", "is_fest", "is_holiday"]:
                 model.add_regressor(reg)
             model.fit(train)
             
-            forecast = model.predict(test[["ds", "is_rainy", "is_cold", "is_hot", "is_exam", "is_fest", "is_holiday"]])
+            forecast = model.predict(test[["ds", "is_rainy", "is_cold", "is_exam", "is_fest", "is_holiday"]])
             
             actual = test["y"].values
             predicted = forecast["yhat"].values
