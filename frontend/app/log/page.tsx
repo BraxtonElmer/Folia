@@ -2,8 +2,15 @@
 
 import DashboardLayout from '../components/DashboardLayout';
 import { useState, useEffect } from 'react';
-import { Plus, Search } from 'lucide-react';
+import { Plus, Search, ArrowUpDown } from 'lucide-react';
 import { fetchLogs, fetchCanteens, fetchItems, createLog } from '../lib/api';
+
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const formatDate = (s: string) => {
+  if (!s) return '—';
+  const [y, m, d] = s.split('-');
+  return `${MONTHS[parseInt(m) - 1]} ${parseInt(d)}, ${y}`;
+};
 
 export default function LogPage() {
   const [mounted, setMounted] = useState(false);
@@ -15,6 +22,7 @@ export default function LogPage() {
   const [search, setSearch] = useState('');
   const [filterCanteen, setFilterCanteen] = useState('');
   const [filterMeal, setFilterMeal] = useState('');
+  const [sortDir, setSortDir] = useState<'desc' | 'asc'>('desc');
 
   // Form state
   const [formCanteen, setFormCanteen] = useState('');
@@ -83,6 +91,12 @@ export default function LogPage() {
         return name.toLowerCase().includes(search.toLowerCase());
       })
     : logs;
+
+  const sortedLogs = [...filteredLogs].sort((a, b) =>
+    sortDir === 'desc'
+      ? (b.log_date || '').localeCompare(a.log_date || '')
+      : (a.log_date || '').localeCompare(b.log_date || '')
+  );
 
   return (
     <DashboardLayout>
@@ -189,7 +203,15 @@ export default function LogPage() {
             <table className="table">
               <thead>
                 <tr>
-                  <th>Date</th>
+                  <th
+                    style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}
+                    onClick={() => setSortDir(d => d === 'desc' ? 'asc' : 'desc')}
+                  >
+                    <span className="flex items-center gap-1">
+                      Date <ArrowUpDown size={12} />
+                      <span className="text-xs text-muted">{sortDir === 'desc' ? '(newest)' : '(oldest)'}</span>
+                    </span>
+                  </th>
                   <th>Canteen</th>
                   <th>Item</th>
                   <th>Meal</th>
@@ -201,11 +223,11 @@ export default function LogPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredLogs.map((log: any) => {
+                {sortedLogs.map((log: any) => {
                   const wasteRate = Math.round((log.leftover_qty / Math.max(log.prepared_qty, 1)) * 100);
                   return (
                     <tr key={log.id}>
-                      <td>{new Date(log.log_date).toLocaleDateString('en', { month: 'short', day: 'numeric' })}</td>
+                      <td style={{ whiteSpace: 'nowrap' }}>{formatDate(log.log_date)}</td>
                       <td>{log.canteens?.name || '—'}</td>
                       <td className="font-medium" style={{ color: 'var(--text)' }}>{log.food_items?.name || '—'}</td>
                       <td><span className="badge">{log.meal_type}</span></td>
