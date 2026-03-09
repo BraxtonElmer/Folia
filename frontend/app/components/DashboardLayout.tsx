@@ -15,6 +15,7 @@ import {
   Vote,
   FileText,
   Leaf,
+  Settings,
 } from 'lucide-react';
 
 const navItems = [
@@ -28,6 +29,7 @@ const navItems = [
   { label: 'Benchmarking', href: '/benchmark', icon: Building2, section: 'Operations' },
   { label: 'Student Votes', href: '/vote', icon: Vote, section: 'Engagement' },
   { label: 'Weekly Report', href: '/report', icon: FileText, section: 'Reports' },
+  { label: 'Settings', href: '/settings', icon: Settings, section: 'Admin' },
 ];
 
 function Sidebar() {

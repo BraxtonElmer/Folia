@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
-from db import supabase_get, supabase_post, supabase_patch
+from db import supabase_get, supabase_post, supabase_patch, supabase_delete
 from forecast_engine import forecast_engine
 
 load_dotenv()
@@ -58,6 +58,37 @@ class VoteRequest(BaseModel):
     item_id: str
 
 
+class CanteenCreate(BaseModel):
+    name: str
+    location: str
+
+
+class CanteenUpdate(BaseModel):
+    name: str | None = None
+    location: str | None = None
+
+
+class FoodItemCreate(BaseModel):
+    canteen_id: str
+    name: str
+    category: str
+    cost_per_portion: float
+
+
+class FoodItemUpdate(BaseModel):
+    canteen_id: str | None = None
+    name: str | None = None
+    category: str | None = None
+    cost_per_portion: float | None = None
+
+
+class IngredientUpdate(BaseModel):
+    name: str | None = None
+    qty_kg: float | None = None
+    purchase_date: str | None = None
+    shelf_life_days: int | None = None
+
+
 # ============ STARTUP ============
 
 @app.on_event("startup")
@@ -88,6 +119,25 @@ async def get_canteens():
     return await supabase_get("canteens", {"select": "*", "order": "name"})
 
 
+@app.post("/api/canteens")
+async def create_canteen(canteen: CanteenCreate):
+    return await supabase_post("canteens", canteen.model_dump())
+
+
+@app.patch("/api/canteens/{canteen_id}")
+async def update_canteen(canteen_id: str, canteen: CanteenUpdate):
+    data = {k: v for k, v in canteen.model_dump().items() if v is not None}
+    if not data:
+        raise HTTPException(400, "No fields to update")
+    return await supabase_patch("canteens", data, {"id": f"eq.{canteen_id}"})
+
+
+@app.delete("/api/canteens/{canteen_id}")
+async def delete_canteen(canteen_id: str):
+    await supabase_delete("canteens", {"id": f"eq.{canteen_id}"})
+    return {"deleted": True}
+
+
 # ============ FOOD ITEMS ============
 
 @app.get("/api/items")
@@ -96,6 +146,25 @@ async def get_items(canteen_id: str = None):
     if canteen_id and canteen_id != "all":
         params["canteen_id"] = f"eq.{canteen_id}"
     return await supabase_get("food_items", params)
+
+
+@app.post("/api/items")
+async def create_item(item: FoodItemCreate):
+    return await supabase_post("food_items", item.model_dump())
+
+
+@app.patch("/api/items/{item_id}")
+async def update_item(item_id: str, item: FoodItemUpdate):
+    data = {k: v for k, v in item.model_dump().items() if v is not None}
+    if not data:
+        raise HTTPException(400, "No fields to update")
+    return await supabase_patch("food_items", data, {"id": f"eq.{item_id}"})
+
+
+@app.delete("/api/items/{item_id}")
+async def delete_item(item_id: str):
+    await supabase_delete("food_items", {"id": f"eq.{item_id}"})
+    return {"deleted": True}
 
 
 # ============ WASTE LOGS ============
@@ -404,6 +473,20 @@ async def get_expiry_alerts(canteen_id: str = None):
 @app.post("/api/ingredients")
 async def add_ingredient(ing: IngredientCreate):
     return await supabase_post("ingredients", ing.model_dump())
+
+
+@app.patch("/api/ingredients/{ingredient_id}")
+async def update_ingredient(ingredient_id: str, ing: IngredientUpdate):
+    data = {k: v for k, v in ing.model_dump().items() if v is not None}
+    if not data:
+        raise HTTPException(400, "No fields to update")
+    return await supabase_patch("ingredients", data, {"id": f"eq.{ingredient_id}"})
+
+
+@app.delete("/api/ingredients/{ingredient_id}")
+async def delete_ingredient(ingredient_id: str):
+    await supabase_delete("ingredients", {"id": f"eq.{ingredient_id}"})
+    return {"deleted": True}
 
 
 # ============ MENU SUGGESTIONS ============

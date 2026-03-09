@@ -79,6 +79,27 @@ CREATE POLICY "Public read waste_logs" ON waste_logs FOR SELECT USING (true);
 CREATE POLICY "Public read ingredients" ON ingredients FOR SELECT USING (true);
 CREATE POLICY "Public read student_votes" ON student_votes FOR SELECT USING (true);
 
+-- Write access policies (server-side via anon/service key)
+CREATE POLICY "Public insert canteens" ON canteens FOR INSERT WITH CHECK (true);
+CREATE POLICY "Public update canteens" ON canteens FOR UPDATE USING (true);
+CREATE POLICY "Public delete canteens" ON canteens FOR DELETE USING (true);
+
+CREATE POLICY "Public insert food_items" ON food_items FOR INSERT WITH CHECK (true);
+CREATE POLICY "Public update food_items" ON food_items FOR UPDATE USING (true);
+CREATE POLICY "Public delete food_items" ON food_items FOR DELETE USING (true);
+
+CREATE POLICY "Public insert waste_logs" ON waste_logs FOR INSERT WITH CHECK (true);
+CREATE POLICY "Public update waste_logs" ON waste_logs FOR UPDATE USING (true);
+CREATE POLICY "Public delete waste_logs" ON waste_logs FOR DELETE USING (true);
+
+CREATE POLICY "Public insert ingredients" ON ingredients FOR INSERT WITH CHECK (true);
+CREATE POLICY "Public update ingredients" ON ingredients FOR UPDATE USING (true);
+CREATE POLICY "Public delete ingredients" ON ingredients FOR DELETE USING (true);
+
+CREATE POLICY "Public insert student_votes" ON student_votes FOR INSERT WITH CHECK (true);
+CREATE POLICY "Public update student_votes" ON student_votes FOR UPDATE USING (true);
+CREATE POLICY "Public delete student_votes" ON student_votes FOR DELETE USING (true);
+
 -- Public write access policies (for hackathon demo)
 CREATE POLICY "Public insert waste_logs" ON waste_logs FOR INSERT WITH CHECK (true);
 CREATE POLICY "Public insert ingredients" ON ingredients FOR INSERT WITH CHECK (true);

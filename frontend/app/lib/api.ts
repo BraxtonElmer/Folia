@@ -196,6 +196,41 @@ export async function castVoteAPI(canteenId: string, itemId: string) {
   });
 }
 
+// ============ CANTEENS CRUD ============
+export async function createCanteen(data: { name: string; location: string }) {
+  return api<any>('/api/canteens', { method: 'POST', body: JSON.stringify(data) });
+}
+
+export async function updateCanteen(id: string, data: { name?: string; location?: string }) {
+  return api<any>(`/api/canteens/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+}
+
+export async function deleteCanteen(id: string) {
+  return api<any>(`/api/canteens/${id}`, { method: 'DELETE' });
+}
+
+// ============ FOOD ITEMS CRUD ============
+export async function createItem(data: { canteen_id: string; name: string; category: string; cost_per_portion: number }) {
+  return api<any>('/api/items', { method: 'POST', body: JSON.stringify(data) });
+}
+
+export async function updateItem(id: string, data: { canteen_id?: string; name?: string; category?: string; cost_per_portion?: number }) {
+  return api<any>(`/api/items/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+}
+
+export async function deleteItem(id: string) {
+  return api<any>(`/api/items/${id}`, { method: 'DELETE' });
+}
+
+// ============ INGREDIENTS CRUD ============
+export async function updateIngredient(id: string, data: { name?: string; qty_kg?: number; purchase_date?: string; shelf_life_days?: number }) {
+  return api<any>(`/api/ingredients/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+}
+
+export async function deleteIngredient(id: string) {
+  return api<any>(`/api/ingredients/${id}`, { method: 'DELETE' });
+}
+
 // ============ REPORT ============
 export async function fetchWeeklyReport(canteenId: string) {
   return api<{
