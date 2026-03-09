@@ -19,6 +19,7 @@ export default function AnalyticsPage() {
   const [mounted, setMounted] = useState(false);
   const [canteens, setCanteens] = useState<any[]>([]);
   const [canteenId, setCanteenId] = useState('');
+  const [days, setDays] = useState(90);
   const [byItem, setByItem] = useState<any[]>([]);
   const [byDay, setByDay] = useState<any[]>([]);
   const [trend, setTrend] = useState<any[]>([]);
@@ -36,16 +37,16 @@ export default function AnalyticsPage() {
     Promise.all([
       fetchAnalyticsByItem(cid),
       fetchAnalyticsByDay(cid),
-      fetchAnalyticsTrend(cid, 90),
+      fetchAnalyticsTrend(cid, days),
       fetchHeatmap(cid),
-    ]).then(([items, days, trd, hm]) => {
+    ]).then(([items, daysData, trd, hm]) => {
       setByItem(items.slice(0, 10));
-      setByDay(days);
+      setByDay(daysData);
       setTrend(trd);
       setHeatmap(hm);
     }).catch(() => {})
     .finally(() => setLoading(false));
-  }, [canteenId]);
+  }, [canteenId, days]);
 
   if (!mounted) return <DashboardLayout><div className="page-body" /></DashboardLayout>;
 
@@ -61,10 +62,18 @@ export default function AnalyticsPage() {
             <h2>Waste Analytics</h2>
             <p>Deep dive into your food waste patterns</p>
           </div>
-          <select className="form-select" style={{ width: 180 }} value={canteenId} onChange={e => setCanteenId(e.target.value)}>
-            <option value="">All Canteens</option>
-            {canteens.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
+          <div className="flex items-center gap-3">
+            <select className="form-select" style={{ width: 120 }} value={days} onChange={e => setDays(Number(e.target.value))}>
+              <option value={30}>Last 30d</option>
+              <option value={60}>Last 60d</option>
+              <option value={90}>Last 90d</option>
+              <option value={365}>Last 365d</option>
+            </select>
+            <select className="form-select" style={{ width: 180 }} value={canteenId} onChange={e => setCanteenId(e.target.value)}>
+              <option value="">All Canteens</option>
+              {canteens.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
         </div>
       </div>
 
@@ -106,7 +115,7 @@ export default function AnalyticsPage() {
             </div>
 
             <div className="card animate-in mb-6">
-              <div className="section-title">Waste Trend Over Time</div>
+              <div className="section-title">Waste Trend — Last {days} Days</div>
               <div className="chart-container">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={trend} margin={{ top: 8, right: 16, bottom: 8, left: 0 }}>
