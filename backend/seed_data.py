@@ -1,5 +1,5 @@
 """
-Real-world seed data generator for ZeroWaste.
+Real-world seed data generator for Folia.
 Generates 1 year (365 days) of realistic canteen waste data
 based on patterns observed in actual Indian university canteens.
 

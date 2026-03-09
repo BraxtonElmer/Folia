@@ -1,5 +1,5 @@
 """
-Prophet-based demand forecasting engine for ZeroWaste.
+Prophet-based demand forecasting engine for Folia.
 Trains per-item Prophet models on historical waste data
 with weather, event, and day-of-week regressors.
 """

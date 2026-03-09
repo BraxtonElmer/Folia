@@ -1,6 +1,6 @@
 """
-ZeroWaste FastAPI Backend
-All API endpoints for the Campus Food Waste Intelligence Platform.
+Folia FastAPI Backend
+All API endpoints for the Folia Campus Food Intelligence Platform.
 """
 
 import os
@@ -16,8 +16,8 @@ from forecast_engine import forecast_engine
 load_dotenv()
 
 app = FastAPI(
-    title="ZeroWaste API",
-    description="Campus Food Waste Intelligence Platform — API",
+    title="Folia API",
+    description="Folia — Campus Food Intelligence Platform API",
     version="1.0.0",
 )
 
@@ -78,7 +78,7 @@ async def startup():
 
 @app.get("/")
 async def root():
-    return {"name": "ZeroWaste API", "status": "running", "model_trained": forecast_engine.is_trained}
+    return {"name": "Folia API", "status": "running", "model_trained": forecast_engine.is_trained}
 
 
 # ============ CANTEENS ============

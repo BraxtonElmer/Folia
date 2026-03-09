@@ -1,5 +1,5 @@
 """
-Supabase client for ZeroWaste backend.
+Supabase client for Folia backend.
 Uses httpx to call Supabase REST API (PostgREST).
 """
 
