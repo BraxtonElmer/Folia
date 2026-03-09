@@ -22,6 +22,7 @@ export default function LogPage() {
   const [search, setSearch] = useState('');
   const [filterCanteen, setFilterCanteen] = useState('');
   const [filterMeal, setFilterMeal] = useState('');
+  const [dateRange, setDateRange] = useState('30'); // days back; '' = all time
   const [sortDir, setSortDir] = useState<'desc' | 'asc'>('desc');
 
   // Form state
@@ -50,9 +51,14 @@ export default function LogPage() {
 
   const loadLogs = () => {
     setLoading(true);
-    const params: any = { limit: 200 };
+    const params: any = { limit: 1000 };
     if (filterCanteen) params.canteen_id = filterCanteen;
     if (filterMeal) params.meal_type = filterMeal;
+    if (dateRange) {
+      const d = new Date();
+      d.setDate(d.getDate() - parseInt(dateRange));
+      params.start_date = d.toISOString().split('T')[0];
+    }
     fetchLogs(params)
       .then(setLogs)
       .catch(() => {})
@@ -61,7 +67,7 @@ export default function LogPage() {
 
   useEffect(() => {
     if (mounted) loadLogs();
-  }, [filterCanteen, filterMeal]);
+  }, [filterCanteen, filterMeal, dateRange]);
 
   if (!mounted) return <DashboardLayout><div className="page-body" /></DashboardLayout>;
 
@@ -178,11 +184,17 @@ export default function LogPage() {
         )}
 
         {/* Filters */}
-        <div className="flex items-center gap-4 mb-4">
-          <div className="form-group" style={{ flex: 1, position: 'relative' }}>
+        <div className="flex items-center gap-4 mb-4" style={{ flexWrap: 'wrap' }}>
+          <div className="form-group" style={{ flex: 1, minWidth: 160, position: 'relative' }}>
             <Search size={16} style={{ position: 'absolute', left: 12, top: 10, color: 'var(--text-muted)' }} />
             <input className="form-input" placeholder="Search food items..." value={search} onChange={e => setSearch(e.target.value)} style={{ paddingLeft: 36 }} />
           </div>
+          <select className="form-select" style={{ width: 130 }} value={dateRange} onChange={e => setDateRange(e.target.value)}>
+            <option value="7">Last 7 days</option>
+            <option value="30">Last 30 days</option>
+            <option value="90">Last 90 days</option>
+            <option value="">All time</option>
+          </select>
           <select className="form-select" style={{ width: 160 }} value={filterCanteen} onChange={e => setFilterCanteen(e.target.value)}>
             <option value="">All Canteens</option>
             {canteens.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
