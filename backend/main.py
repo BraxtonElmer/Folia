@@ -93,7 +93,7 @@ async def get_canteens():
 @app.get("/api/items")
 async def get_items(canteen_id: str = None):
     params: dict = {"select": "*", "order": "name"}
-    if canteen_id:
+    if canteen_id and canteen_id != "all":
         params["canteen_id"] = f"eq.{canteen_id}"
     return await supabase_get("food_items", params)
 
@@ -110,19 +110,19 @@ async def get_logs(
     limit: int = 200,
 ):
     params: dict = {"select": "*,food_items(name,category),canteens(name)", "order": "log_date.desc", "limit": str(limit)}
-    if canteen_id:
+    if canteen_id and canteen_id != "all":
         params["canteen_id"] = f"eq.{canteen_id}"
     if item_id:
         params["item_id"] = f"eq.{item_id}"
-    if start_date:
-        params["log_date"] = f"gte.{start_date}"
-    if end_date:
-        if "log_date" in params:
-            # PostgREST doesn't support two filters on same col easily, use and filter
-            pass
-        params["log_date"] = f"lte.{end_date}"
     if meal_type:
         params["meal_type"] = f"eq.{meal_type}"
+    # PostgREST range filter using `and` to avoid duplicate key collision
+    if start_date and end_date:
+        params["and"] = f"(log_date.gte.{start_date},log_date.lte.{end_date})"
+    elif start_date:
+        params["log_date"] = f"gte.{start_date}"
+    elif end_date:
+        params["log_date"] = f"lte.{end_date}"
     return await supabase_get("waste_logs", params)
 
 
@@ -214,7 +214,7 @@ async def train_model():
 @app.get("/api/analytics/by-item")
 async def analytics_by_item(canteen_id: str = None):
     params: dict = {"select": "item_id,prepared_qty,leftover_qty,food_items(name)", "order": "log_date.desc", "limit": "10000"}
-    if canteen_id:
+    if canteen_id and canteen_id != "all":
         params["canteen_id"] = f"eq.{canteen_id}"
     logs = await supabase_get("waste_logs", params)
     
@@ -241,7 +241,7 @@ async def analytics_by_item(canteen_id: str = None):
 @app.get("/api/analytics/by-day")
 async def analytics_by_day(canteen_id: str = None):
     params: dict = {"select": "log_date,prepared_qty,leftover_qty", "order": "log_date.desc", "limit": "10000"}
-    if canteen_id:
+    if canteen_id and canteen_id != "all":
         params["canteen_id"] = f"eq.{canteen_id}"
     logs = await supabase_get("waste_logs", params)
     
@@ -265,7 +265,7 @@ async def analytics_by_day(canteen_id: str = None):
 @app.get("/api/analytics/trend")
 async def analytics_trend(canteen_id: str = None, days: int = 90):
     params: dict = {"select": "log_date,prepared_qty,leftover_qty", "order": "log_date.desc", "limit": "10000"}
-    if canteen_id:
+    if canteen_id and canteen_id != "all":
         params["canteen_id"] = f"eq.{canteen_id}"
     logs = await supabase_get("waste_logs", params)
     
@@ -292,7 +292,7 @@ async def analytics_trend(canteen_id: str = None, days: int = 90):
 @app.get("/api/analytics/heatmap")
 async def analytics_heatmap(canteen_id: str = None):
     params: dict = {"select": "log_date,meal_type,prepared_qty,leftover_qty", "order": "log_date.desc", "limit": "10000"}
-    if canteen_id:
+    if canteen_id and canteen_id != "all":
         params["canteen_id"] = f"eq.{canteen_id}"
     logs = await supabase_get("waste_logs", params)
     
@@ -329,7 +329,7 @@ WATER_PER_PORTION = 150
 @app.get("/api/roi")
 async def get_roi(canteen_id: str = None, start_date: str = None, end_date: str = None):
     params: dict = {"select": "item_id,prepared_qty,sold_qty,leftover_qty,food_items(cost_per_portion)", "order": "log_date.desc", "limit": "10000"}
-    if canteen_id:
+    if canteen_id and canteen_id != "all":
         params["canteen_id"] = f"eq.{canteen_id}"
     if start_date:
         params["log_date"] = f"gte.{start_date}"
@@ -376,7 +376,7 @@ DISH_MAP = {
 @app.get("/api/expiry")
 async def get_expiry_alerts(canteen_id: str = None):
     params: dict = {"select": "*", "order": "purchase_date"}
-    if canteen_id:
+    if canteen_id and canteen_id != "all":
         params["canteen_id"] = f"eq.{canteen_id}"
     ingredients = await supabase_get("ingredients", params)
     

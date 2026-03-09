@@ -56,7 +56,7 @@ export default function VotePage() {
         <div style={{ maxWidth: 720, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div className="flex items-center gap-3">
             <Leaf size={20} color="var(--accent)" />
-            <span className="font-semibold">ZeroWaste</span>
+            <span className="font-semibold">Folia</span>
             <span className="badge badge-success">Student Portal</span>
           </div>
           <span className="text-xs text-muted">Your vote helps reduce food waste</span>
