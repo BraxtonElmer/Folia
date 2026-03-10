@@ -259,6 +259,32 @@ export async function deleteIngredient(id: string) {
   return api<any>(`/api/ingredients/${id}`, { method: 'DELETE' });
 }
 
+// ============ BIOGAS ============
+export async function fetchBiogasData(params?: {
+  canteen_id?: string;
+  start_date?: string;
+  end_date?: string;
+}) {
+  const searchParams = new URLSearchParams();
+  if (params) {
+    Object.entries(params).forEach(([k, v]) => { if (v) searchParams.set(k, v); });
+  }
+  const qs = searchParams.toString();
+  return api<{
+    summary: {
+      total_kg: number;
+      by_category: {
+        grains: number; vegetables: number; fruits: number;
+        dairy: number; meat: number; bread: number; mixed: number;
+      };
+      total_biogas_m3: number;
+      total_kwh: number;
+      total_co2_kg: number;
+    };
+    timeline: { date: string; total_kg: number; biogas_m3: number; kwh: number; co2_kg: number }[];
+  }>(`/api/biogas${qs ? `?${qs}` : ''}`);
+}
+
 // ============ REPORT ============
 export async function fetchWeeklyReport(canteenId: string) {
   return api<{

@@ -4,6 +4,8 @@ All API endpoints for the Folia Campus Food Intelligence Platform.
 """
 
 import os
+import json
+import re
 from datetime import datetime, timedelta
 from fastapi import FastAPI, HTTPException, Query, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,7 +14,7 @@ from dotenv import load_dotenv
 
 from db import supabase_get, supabase_post, supabase_patch, supabase_delete
 from forecast_engine import forecast_engine
-from importer import process_csv
+from importer import process_csv, ask_gemini
 
 load_dotenv()
 
@@ -417,9 +419,11 @@ async def get_roi(canteen_id: str = None, start_date: str = None, end_date: str 
     params: dict = {"select": "item_id,prepared_qty,sold_qty,leftover_qty,food_items(cost_per_portion)", "order": "log_date.desc", "limit": "10000"}
     if canteen_id and canteen_id != "all":
         params["canteen_id"] = f"eq.{canteen_id}"
-    if start_date:
+    if start_date and end_date:
+        params["and"] = f"(log_date.gte.{start_date},log_date.lte.{end_date})"
+    elif start_date:
         params["log_date"] = f"gte.{start_date}"
-    if end_date:
+    elif end_date:
         params["log_date"] = f"lte.{end_date}"
     
     logs = await supabase_get("waste_logs", params)
@@ -443,6 +447,139 @@ async def get_roi(canteen_id: str = None, start_date: str = None, end_date: str 
         "water_saved": round(total_wasted * WATER_PER_PORTION * 0.5),
         "meals_equivalent": total_wasted,
         "waste_percentage": round(waste_pct, 1),
+    }
+
+
+# ============ BIOGAS ============
+
+# In-memory cache: item name (lowercase) → (biogas_category, kg_per_portion)
+_biogas_name_cache: dict[str, tuple[str, float]] = {}
+
+# Biogas yield m³ per metric ton of wet waste (EBA/IEA Bioenergy data)
+_BIOGAS_YIELD: dict[str, float] = {
+    "grains":     430,
+    "vegetables": 350,
+    "fruits":     380,
+    "dairy":      520,
+    "meat":       600,
+    "bread":      470,
+    "mixed":      400,
+}
+
+_BIOGAS_KWH_PER_M3 = 1.7   # micro-CHP at 35% electrical efficiency
+_BIOGAS_CO2_PER_M3 = 1.9   # kg CO2 avoided vs landfill baseline
+
+
+async def _classify_items_for_biogas(item_names: list[str]) -> None:
+    """
+    Use Gemini to classify food item names into biogas categories.
+    Results are cached in _biogas_name_cache to avoid repeated API calls.
+    """
+    uncached = [n for n in item_names if n.lower() not in _biogas_name_cache]
+    if not uncached:
+        return
+
+    prompt = f"""You are a biogas and food science expert. Classify each Indian canteen food item
+into the most appropriate wet-waste anaerobic digestion category, and estimate the wet weight
+in kilograms for one standard served portion.
+
+Biogas categories:
+- grains     : cooked rice, biryani, pulao, khichdi, poha, upma, idli, dosa, idiyappam, pongal
+- vegetables : sabzi, dal, sambar, rasam, curry with vegetables, salad, kootu, avial
+- fruits     : fresh fruit, fruit salad, juice
+- dairy      : paneer dishes, lassi, milk, curd, raita, curd rice, kheer, payasam
+- meat       : chicken, mutton, fish, egg, prawn, seafood dishes
+- bread      : roti, chapati, naan, paratha, puri, bhatura, bread slices, bun
+- mixed      : thali, combo meal, fried snacks (samosa, vada, pakoda), noodles, pasta, sandwich, soup
+
+Items to classify: {json.dumps(uncached)}
+
+Return ONLY valid JSON with no markdown fences, mapping each item name to:
+  "category": one of grains/vegetables/fruits/dairy/meat/bread/mixed
+  "kg_per_portion": float between 0.05 and 0.60
+
+Example:
+{{"Dal Tadka": {{"category": "vegetables", "kg_per_portion": 0.25}}, "Jeera Rice": {{"category": "grains", "kg_per_portion": 0.28}}}}"""
+
+    try:
+        raw = await ask_gemini(prompt)
+        raw = re.sub(r"```[a-z]*\s*|```\s*", "", raw).strip()
+        classifications = json.loads(raw)
+        for name, info in classifications.items():
+            cat = info.get("category", "mixed")
+            if cat not in _BIOGAS_YIELD:
+                cat = "mixed"
+            kg = max(0.05, min(0.60, float(info.get("kg_per_portion", 0.25))))
+            _biogas_name_cache[name.lower()] = (cat, kg)
+    except Exception:
+        # On Gemini failure, cache items as mixed/0.25 to avoid repeated failures
+        for name in uncached:
+            if name.lower() not in _biogas_name_cache:
+                _biogas_name_cache[name.lower()] = ("mixed", 0.25)
+
+
+@app.get("/api/biogas")
+async def get_biogas_data(canteen_id: str = None, start_date: str = None, end_date: str = None):
+    params: dict = {
+        "select": "log_date,leftover_qty,food_items(name,category)",
+        "order": "log_date.asc",
+        "limit": "20000",
+    }
+    if canteen_id and canteen_id != "all":
+        params["canteen_id"] = f"eq.{canteen_id}"
+    if start_date and end_date:
+        params["and"] = f"(log_date.gte.{start_date},log_date.lte.{end_date})"
+    elif start_date:
+        params["log_date"] = f"gte.{start_date}"
+    elif end_date:
+        params["log_date"] = f"lte.{end_date}"
+
+    logs = await supabase_get("waste_logs", params)
+
+    # Collect unique item names and classify via Gemini (with caching)
+    unique_names = list({
+        log["food_items"]["name"]
+        for log in logs
+        if isinstance(log.get("food_items"), dict) and log["food_items"].get("name")
+    })
+    await _classify_items_for_biogas(unique_names)
+
+    category_kg: dict[str, float] = {k: 0.0 for k in _BIOGAS_YIELD}
+    timeline: dict[str, dict] = {}
+
+    for log in logs:
+        food_item = log.get("food_items") or {}
+        item_name = food_item.get("name", "") if isinstance(food_item, dict) else ""
+        biogas_cat, kg_per_portion = _biogas_name_cache.get(item_name.lower(), ("mixed", 0.25))
+
+        leftover = log.get("leftover_qty", 0) or 0
+        kg = leftover * kg_per_portion
+        category_kg[biogas_cat] += kg
+
+        date = log.get("log_date", "unknown")
+        if date not in timeline:
+            timeline[date] = {"date": date, "total_kg": 0.0, "biogas_m3": 0.0, "kwh": 0.0, "co2_kg": 0.0}
+
+        biogas_m3 = (kg / 1000) * _BIOGAS_YIELD[biogas_cat]
+        timeline[date]["total_kg"] = round(timeline[date]["total_kg"] + kg, 3)
+        timeline[date]["biogas_m3"] = round(timeline[date]["biogas_m3"] + biogas_m3, 4)
+        timeline[date]["kwh"] = round(timeline[date]["kwh"] + biogas_m3 * _BIOGAS_KWH_PER_M3, 4)
+        timeline[date]["co2_kg"] = round(timeline[date]["co2_kg"] + biogas_m3 * _BIOGAS_CO2_PER_M3, 4)
+
+    total_biogas_m3 = sum(
+        (kg / 1000) * _BIOGAS_YIELD[cat]
+        for cat, kg in category_kg.items()
+    )
+
+    return {
+        "summary": {
+            "total_kg": round(sum(category_kg.values()), 2),
+            "by_category": {k: round(v, 2) for k, v in category_kg.items()},
+            "total_biogas_m3": round(total_biogas_m3, 3),
+            "total_kwh": round(total_biogas_m3 * _BIOGAS_KWH_PER_M3, 3),
+            "total_co2_kg": round(total_biogas_m3 * _BIOGAS_CO2_PER_M3, 3),
+        },
+        "timeline": sorted(timeline.values(), key=lambda x: x["date"]),
     }
 
 
