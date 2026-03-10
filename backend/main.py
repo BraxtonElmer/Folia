@@ -737,6 +737,8 @@ async def import_preview(
     except Exception as e:
         raise HTTPException(500, f"Import processing failed: {e}")
 
+    # Expose full item list so the frontend can render mapping dropdowns
+    result["available_items"] = [{"id": item["id"], "name": item["name"]} for item in items]
     return result
 
 

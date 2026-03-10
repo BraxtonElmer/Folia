@@ -1,13 +1,12 @@
 'use client';
 
 import DashboardLayout from '../components/DashboardLayout';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   UploadCloud, CheckCircle2, XCircle, AlertTriangle,
-  Sparkles, FileSpreadsheet, RefreshCw, ArrowRight,
+  Sparkles, FileSpreadsheet, RefreshCw, ArrowRight, Plus,
 } from 'lucide-react';
-import { fetchCanteens } from '../lib/api';
-import { importCsvPreview, importCsvCommit, trainModel } from '../lib/api';
+import { fetchCanteens, importCsvPreview, importCsvCommit, trainModel, createItem } from '../lib/api';
 
 type Step = 'setup' | 'preview' | 'done';
 
@@ -20,6 +19,16 @@ const dropZoneBase: React.CSSProperties = {
   transition: 'all 200ms ease',
   background: 'var(--bg-secondary)',
 };
+
+const CATEGORIES = [
+  'Breakfast', 'Main Course', 'Street Food', 'South Indian',
+  'Continental', 'Dessert', 'Beverages', 'Snacks',
+];
+
+type Resolution =
+  | { mode: 'skip' }
+  | { mode: 'map'; itemId?: string }
+  | { mode: 'create'; category?: string; cost?: string };
 
 function StepIndicator({ current }: { current: Step }) {
   const steps: { key: Step; label: string }[] = [
@@ -76,6 +85,13 @@ export default function ImportPage() {
   const [retraining, setRetraining] = useState(false);
   const [retrainMsg, setRetrainMsg] = useState('');
 
+  // Resolution state for unmatched items
+  const [resolutions, setResolutions] = useState<Record<string, Resolution>>({});
+  const [createdItems, setCreatedItems] = useState<Record<string, string>>({});
+  const [creatingItem, setCreatingItem] = useState<Record<string, boolean>>({});
+  const [createErrors, setCreateErrors] = useState<Record<string, string>>({});
+  const [defaultPrepQty, setDefaultPrepQty] = useState('');
+
   useEffect(() => {
     setMounted(true);
     fetchCanteens().then(c => {
@@ -113,11 +129,62 @@ export default function ImportPage() {
     try {
       const data = await importCsvPreview(file, canteenId);
       setPreviewData(data);
+      // Initialise all unmatched items as 'skip' by default
+      const initRes: Record<string, Resolution> = {};
+      (data.unmatched_items || []).forEach((n: string) => { initRes[n] = { mode: 'skip' }; });
+      setResolutions(initRes);
+      setCreatedItems({});
+      setCreateErrors({});
+      setDefaultPrepQty('');
       setStep('preview');
     } catch (err: any) {
       setSetupError(err.message || 'Analysis failed');
     } finally {
       setAnalyzing(false);
+    }
+  };
+
+  // ── Effective rows (resolutions + default qty applied live) ─────────────
+  const effectiveRows = useMemo(() => {
+    if (!previewData) return [];
+    const prepNum = defaultPrepQty ? parseInt(defaultPrepQty) : 0;
+    const prepMissing = !previewData.mapping?.prepared_qty;
+    return previewData.rows.map((row: any) => {
+      let r = { ...row };
+      if (!r.matched) {
+        const res: any = resolutions[r.item_name_raw];
+        if (res?.mode === 'map' && res.itemId) {
+          r = { ...r, item_id: res.itemId, matched: true };
+        } else if (res?.mode === 'create' && createdItems[r.item_name_raw]) {
+          r = { ...r, item_id: createdItems[r.item_name_raw], matched: true };
+        }
+      }
+      if (prepMissing && prepNum > 0) {
+        r = { ...r, prepared_qty: prepNum, leftover_qty: Math.max(0, prepNum - r.sold_qty) };
+      }
+      return r;
+    });
+  }, [previewData, resolutions, createdItems, defaultPrepQty]);
+
+  const handleCreateItem = async (rawName: string) => {
+    const res: any = resolutions[rawName];
+    if (!res || res.mode !== 'create') return;
+    setCreatingItem(prev => ({ ...prev, [rawName]: true }));
+    setCreateErrors(prev => ({ ...prev, [rawName]: '' }));
+    try {
+      const created = await createItem({
+        canteen_id: canteenId,
+        name: rawName,
+        category: res.category || 'Main Course',
+        cost_per_portion: parseFloat(res.cost || '0'),
+      });
+      const newId = Array.isArray(created) ? created[0]?.id : (created as any)?.id;
+      if (!newId) throw new Error('No item ID returned from server');
+      setCreatedItems(prev => ({ ...prev, [rawName]: newId }));
+    } catch (err: any) {
+      setCreateErrors(prev => ({ ...prev, [rawName]: err.message || 'Failed to create item' }));
+    } finally {
+      setCreatingItem(prev => ({ ...prev, [rawName]: false }));
     }
   };
 
@@ -127,7 +194,7 @@ export default function ImportPage() {
     if (!previewData) return;
     setCommitting(true);
     try {
-      const matchedRows = previewData.rows
+      const matchedRows = effectiveRows
         .filter((r: any) => r.matched)
         .map((r: any) => ({
           canteen_id: r.canteen_id,
@@ -176,9 +243,17 @@ export default function ImportPage() {
 
   // ── Derived ───────────────────────────────────────────────────────────────
 
-  const matchedCount = previewData?.rows.filter((r: any) => r.matched).length ?? 0;
+  const matchedCount = effectiveRows.filter((r: any) => r.matched).length;
   const unmatchedCount = previewData?.unmatched_items?.length ?? 0;
+  const unmatchedRemaining = (previewData?.unmatched_items ?? []).filter((n: string) => {
+    const res: any = resolutions[n];
+    if (res?.mode === 'map' && res.itemId) return false;
+    if (res?.mode === 'create' && createdItems[n]) return false;
+    return true;
+  }).length;
   const errorCount = previewData?.errors?.length ?? 0;
+  const prepQtyMissing = previewData ? !previewData.mapping?.prepared_qty : false;
+  const availableItems: { id: string; name: string }[] = previewData?.available_items ?? [];
   const canteenName = (id: string) => canteens.find(c => c.id === id)?.name || id;
 
   // ─── Render ───────────────────────────────────────────────────────────────
@@ -286,9 +361,9 @@ export default function ImportPage() {
                 <div className="card-subtitle">Ready to import</div>
               </div>
               <div className="card animate-in" style={{ borderLeft: '3px solid var(--warning)' }}>
-                <div className="card-title">Unmatched Items</div>
-                <div className="card-value" style={{ color: unmatchedCount > 0 ? 'var(--warning)' : 'var(--text-muted)' }}>{unmatchedCount}</div>
-                <div className="card-subtitle">Rows will be skipped</div>
+                <div className="card-title">Unresolved Items</div>
+                <div className="card-value" style={{ color: unmatchedRemaining > 0 ? 'var(--warning)' : 'var(--text-muted)' }}>{unmatchedRemaining}</div>
+                <div className="card-subtitle">{unmatchedCount - unmatchedRemaining} resolved</div>
               </div>
               <div className="card animate-in" style={{ borderLeft: '3px solid var(--danger)' }}>
                 <div className="card-title">Parse Errors</div>
@@ -306,18 +381,18 @@ export default function ImportPage() {
             <div className="card mb-5 animate-in">
               <div className="section-title mb-3">AI Column Mapping</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
-                {Object.entries(previewData.mapping as Record<string, string>).map(([field, col]) => (
+                {Object.entries(previewData.mapping as Record<string, string | null>).map(([field, col]) => (
                   <div key={field} style={{
-                    background: col ? 'var(--accent-light)' : 'var(--bg-secondary)',
-                    border: `1px solid ${col ? 'var(--accent)' : 'var(--border)'}`,
+                    background: col ? 'var(--accent-light)' : 'var(--warning-light)',
+                    border: `1px solid ${col ? 'var(--accent)' : 'var(--warning)'}`,
                     borderRadius: 'var(--radius)',
                     padding: 'var(--space-2) var(--space-3)',
                     fontSize: 'var(--text-xs)',
                   }}>
                     <span style={{ color: 'var(--text-muted)' }}>{field}</span>
-                    <span style={{ margin: '0 6px', color: 'var(--text-muted)' }}>→</span>
-                    <span style={{ fontWeight: 'var(--weight-semibold)', color: col ? 'var(--accent-dark)' : 'var(--text-muted)' }}>
-                      {col || '(default)'}
+                    <span style={{ margin: '0 6px', color: 'var(--text-muted)' }}>&#8594;</span>
+                    <span style={{ fontWeight: 'var(--weight-semibold)', color: col ? 'var(--accent-dark)' : 'var(--warning)' }}>
+                      {col || '\u26a0 not found'}
                     </span>
                   </div>
                 ))}
@@ -329,23 +404,122 @@ export default function ImportPage() {
               </div>
             </div>
 
-            {/* Unmatched items warning */}
-            {unmatchedCount > 0 && (
-              <div className="card mb-5 animate-in" style={{ background: 'var(--warning-light)', border: '1px solid var(--warning)' }}>
+            {/* ── Missing prepared quantity ─────────────────────────────── */}
+            {prepQtyMissing && (
+              <div className="card mb-5 animate-in" style={{ border: '1px solid var(--warning)', background: 'var(--warning-light)' }}>
                 <div className="flex items-center gap-2 mb-2">
                   <AlertTriangle size={16} style={{ color: 'var(--warning)' }} />
-                  <span className="font-medium text-sm" style={{ color: 'var(--warning)' }}>
-                    {unmatchedCount} item name{unmatchedCount !== 1 ? 's' : ''} not found in {canteenName(canteenId)}'s catalogue
+                  <span className="font-medium text-sm" style={{ color: 'var(--warning)' }}>Prepared quantity column not found in CSV</span>
+                </div>
+                <p className="text-xs mb-3" style={{ color: 'var(--warning)' }}>
+                  Enter a default prepared qty to apply to every row. Leftover will be computed as prepared &#8722; sold.
+                </p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+                  <input
+                    type="number" className="form-input" placeholder="e.g. 100" min="1"
+                    style={{ width: 160 }} value={defaultPrepQty}
+                    onChange={e => setDefaultPrepQty(e.target.value)}
+                  />
+                  {defaultPrepQty && (
+                    <span className="text-xs" style={{ color: 'var(--warning)' }}>&#10003; All rows will use prepared = {defaultPrepQty}</span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ── Unmatched item resolution ─────────────────────────────── */}
+            {unmatchedCount > 0 && (
+              <div className="card mb-5 animate-in">
+                <div className="flex items-center gap-2 mb-1">
+                  <AlertTriangle size={15} style={{ color: 'var(--warning)' }} />
+                  <span className="section-title" style={{ color: 'var(--warning)', display: 'inline' }}>
+                    {unmatchedCount} item{unmatchedCount !== 1 ? 's' : ''} not matched in {canteenName(canteenId)}
                   </span>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {previewData.unmatched_items.map((name: string) => (
-                    <span key={name} className="badge badge-warning">{name}</span>
-                  ))}
+                <p className="text-xs text-muted mb-4">Map each CSV name to an existing item, create it here, or skip those rows.</p>
+                <div className="flex flex-col gap-3">
+                  {(previewData.unmatched_items as string[]).map(rawName => {
+                    const res: any = resolutions[rawName] || { mode: 'skip' };
+                    const isDone = (res.mode === 'map' && res.itemId) || (res.mode === 'create' && createdItems[rawName]);
+                    const isRunning = creatingItem[rawName];
+                    const createErr = createErrors[rawName];
+                    return (
+                      <div key={rawName} style={{
+                        background: isDone ? 'var(--success-light)' : 'var(--bg-secondary)',
+                        border: `1px solid ${isDone ? 'var(--success)' : 'var(--border)'}`,
+                        borderRadius: 'var(--radius-md)', padding: 'var(--space-4)',
+                      }}>
+                        <div className="flex items-center justify-between mb-3" style={{ flexWrap: 'wrap', gap: 'var(--space-2)' }}>
+                          <div className="flex items-center gap-2">
+                            {isDone
+                              ? <CheckCircle2 size={14} style={{ color: 'var(--success)' }} />
+                              : <AlertTriangle size={14} style={{ color: 'var(--warning)' }} />}
+                            <span className="font-medium text-sm">{rawName}</span>
+                            {isDone && <span className="badge badge-success">resolved</span>}
+                          </div>
+                          <div className="flex gap-1">
+                            {(['skip', 'map', 'create'] as const).map(mode => (
+                              <button key={mode}
+                                className={`btn btn-sm ${res.mode === mode ? 'btn-primary' : 'btn-secondary'}`}
+                                onClick={() => setResolutions(prev => ({ ...prev, [rawName]: { mode, category: 'Main Course', cost: '' } }))}
+                                disabled={isRunning}>
+                                {mode === 'skip' ? 'Skip' : mode === 'map' ? 'Map to existing' : 'Create new'}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {res.mode === 'map' && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+                            <span className="text-xs text-muted" style={{ whiteSpace: 'nowrap' }}>Map to:</span>
+                            <select className="form-select" style={{ flex: 1, maxWidth: 320 }}
+                              value={res.itemId || ''}
+                              onChange={e => setResolutions(prev => ({ ...prev, [rawName]: { ...prev[rawName], itemId: e.target.value } }))}>
+                              <option value="">&#8212; select an existing item &#8212;</option>
+                              {availableItems.map((item: any) => (
+                                <option key={item.id} value={item.id}>{item.name}</option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+
+                        {res.mode === 'create' && (
+                          createdItems[rawName] ? (
+                            <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--success)' }}>
+                              <CheckCircle2 size={13} /> Created &#8212; rows will be included in import
+                            </div>
+                          ) : (
+                            <>
+                              <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                                <div className="form-group" style={{ flex: 1, minWidth: 140 }}>
+                                  <label className="form-label">Category</label>
+                                  <select className="form-select" value={res.category || 'Main Course'}
+                                    onChange={e => setResolutions(prev => ({ ...prev, [rawName]: { ...prev[rawName], category: e.target.value } }))}>
+                                    {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                                  </select>
+                                </div>
+                                <div className="form-group" style={{ width: 140 }}>
+                                  <label className="form-label">Cost / portion (&#8377;)</label>
+                                  <input type="number" className="form-input" min="0" step="0.5" placeholder="e.g. 45"
+                                    value={res.cost || ''}
+                                    onChange={e => setResolutions(prev => ({ ...prev, [rawName]: { ...prev[rawName], cost: e.target.value } }))} />
+                                </div>
+                                <button className="btn btn-primary btn-sm" style={{ marginBottom: 2 }}
+                                  onClick={() => handleCreateItem(rawName)}
+                                  disabled={isRunning || !res.cost}>
+                                  {isRunning
+                                    ? <><RefreshCw size={12} style={{ animation: 'spin 1s linear infinite' }} /> Creating&#8230;</>
+                                    : <><Plus size={12} /> Create &#38; import</>}
+                                </button>
+                              </div>
+                              {createErr && <div className="text-xs mt-2" style={{ color: 'var(--danger)' }}>{createErr}</div>}
+                            </>
+                          )
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-                <p className="text-xs mt-2" style={{ color: 'var(--warning)' }}>
-                  Add these items in Settings → Food Items first, then re-import to capture these rows.
-                </p>
               </div>
             )}
 
@@ -385,8 +559,8 @@ export default function ImportPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {previewData.rows.slice(0, 50).map((row: any, i: number) => (
-                    <tr key={i} style={{ opacity: row.matched ? 1 : 0.55 }}>
+                  {effectiveRows.slice(0, 50).map((row: any, i: number) => (
+                    <tr key={i} style={{ opacity: row.matched ? 1 : 0.5 }}>
                       <td>
                         {row.matched
                           ? <CheckCircle2 size={14} style={{ color: 'var(--success)' }} />

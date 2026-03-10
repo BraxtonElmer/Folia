@@ -11,7 +11,9 @@ import io
 import json
 import os
 import re
+import unicodedata
 from datetime import datetime
+from difflib import get_close_matches
 
 import httpx
 
@@ -100,6 +102,15 @@ _DATE_FORMATS = [
 ]
 
 
+def normalize_name(s: str) -> str:
+    """Normalize a food item name for robust matching (handles unicode, extra spaces, punctuation)."""
+    s = unicodedata.normalize("NFKC", str(s))
+    s = s.lower()
+    s = " ".join(s.split())  # Collapse whitespace
+    s = s.strip(".,;:-/\\")
+    return s
+
+
 def parse_date(date_str: str, fmt_hint: str = "") -> str:
     """Parse a date string of any common format into YYYY-MM-DD."""
     date_str = str(date_str).strip()
@@ -181,8 +192,8 @@ async def process_csv(
     date_fmt: str = mapping_data.get("date_format", "")
     compute_leftover: bool = mapping_data.get("compute_leftover", False)
 
-    # Normalised item lookup (lowercase)
-    item_lookup = {k.lower().strip(): v for k, v in item_name_to_id.items()}
+    # Normalised item lookup (fuzzy-friendly)
+    item_lookup = {normalize_name(k): v for k, v in item_name_to_id.items()}
 
     rows = []
     unmatched: set[str] = set()
@@ -197,7 +208,14 @@ async def process_csv(
                 errors.append(f"Row {i}: item name column is empty")
                 continue
 
-            item_id = item_lookup.get(raw_name.lower())
+            # Try exact normalized match first, then fuzzy fallback
+            normalized_name = normalize_name(raw_name)
+            item_id = item_lookup.get(normalized_name)
+            if not item_id:
+                # difflib fuzzy match — cutoff 0.82 catches minor spelling differences
+                close = get_close_matches(normalized_name, list(item_lookup.keys()), n=1, cutoff=0.82)
+                if close:
+                    item_id = item_lookup[close[0]]
             if not item_id:
                 unmatched.add(raw_name)
 
