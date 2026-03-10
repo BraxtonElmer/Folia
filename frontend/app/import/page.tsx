@@ -6,7 +6,7 @@ import {
   UploadCloud, CheckCircle2, XCircle, AlertTriangle,
   Sparkles, FileSpreadsheet, RefreshCw, ArrowRight, Plus,
 } from 'lucide-react';
-import { fetchCanteens, importCsvPreview, importCsvCommit, trainModel, createItem } from '../lib/api';
+import { fetchCanteens, fetchItems, importCsvPreview, importCsvCommit, trainModel, createItem } from '../lib/api';
 
 type Step = 'setup' | 'preview' | 'done';
 
@@ -68,6 +68,7 @@ export default function ImportPage() {
   const [step, setStep] = useState<Step>('setup');
   const [canteens, setCanteens] = useState<any[]>([]);
   const [canteenId, setCanteenId] = useState('');
+  const [availableItems, setAvailableItems] = useState<{ id: string; name: string }[]>([]);
 
   // Setup state
   const [file, setFile] = useState<File | null>(null);
@@ -99,6 +100,33 @@ export default function ImportPage() {
       if (c.length > 0) setCanteenId(c[0].id);
     }).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!canteenId) return;
+    fetchItems(canteenId).then(items => setAvailableItems(items)).catch(() => {});
+  }, [canteenId]);
+
+  // ── Effective rows (resolutions + default qty applied live) ─────────────
+  const effectiveRows = useMemo(() => {
+    if (!previewData) return [];
+    const prepNum = defaultPrepQty ? parseInt(defaultPrepQty) : 0;
+    const prepMissing = !previewData.mapping?.prepared_qty;
+    return previewData.rows.map((row: any) => {
+      let r = { ...row };
+      if (!r.matched) {
+        const res: any = resolutions[r.item_name_raw];
+        if (res?.mode === 'map' && res.itemId) {
+          r = { ...r, item_id: res.itemId, matched: true };
+        } else if (res?.mode === 'create' && createdItems[r.item_name_raw]) {
+          r = { ...r, item_id: createdItems[r.item_name_raw], matched: true };
+        }
+      }
+      if (prepMissing && prepNum > 0) {
+        r = { ...r, prepared_qty: prepNum, leftover_qty: Math.max(0, prepNum - r.sold_qty) };
+      }
+      return r;
+    });
+  }, [previewData, resolutions, createdItems, defaultPrepQty]);
 
   if (!mounted) return <DashboardLayout><div className="page-body" /></DashboardLayout>;
 
@@ -144,28 +172,6 @@ export default function ImportPage() {
     }
   };
 
-  // ── Effective rows (resolutions + default qty applied live) ─────────────
-  const effectiveRows = useMemo(() => {
-    if (!previewData) return [];
-    const prepNum = defaultPrepQty ? parseInt(defaultPrepQty) : 0;
-    const prepMissing = !previewData.mapping?.prepared_qty;
-    return previewData.rows.map((row: any) => {
-      let r = { ...row };
-      if (!r.matched) {
-        const res: any = resolutions[r.item_name_raw];
-        if (res?.mode === 'map' && res.itemId) {
-          r = { ...r, item_id: res.itemId, matched: true };
-        } else if (res?.mode === 'create' && createdItems[r.item_name_raw]) {
-          r = { ...r, item_id: createdItems[r.item_name_raw], matched: true };
-        }
-      }
-      if (prepMissing && prepNum > 0) {
-        r = { ...r, prepared_qty: prepNum, leftover_qty: Math.max(0, prepNum - r.sold_qty) };
-      }
-      return r;
-    });
-  }, [previewData, resolutions, createdItems, defaultPrepQty]);
-
   const handleCreateItem = async (rawName: string) => {
     const res: any = resolutions[rawName];
     if (!res || res.mode !== 'create') return;
@@ -181,6 +187,7 @@ export default function ImportPage() {
       const newId = Array.isArray(created) ? created[0]?.id : (created as any)?.id;
       if (!newId) throw new Error('No item ID returned from server');
       setCreatedItems(prev => ({ ...prev, [rawName]: newId }));
+      setAvailableItems(prev => [...prev, { id: newId, name: rawName }]);
     } catch (err: any) {
       setCreateErrors(prev => ({ ...prev, [rawName]: err.message || 'Failed to create item' }));
     } finally {
@@ -253,7 +260,6 @@ export default function ImportPage() {
   }).length;
   const errorCount = previewData?.errors?.length ?? 0;
   const prepQtyMissing = previewData ? !previewData.mapping?.prepared_qty : false;
-  const availableItems: { id: string; name: string }[] = previewData?.available_items ?? [];
   const canteenName = (id: string) => canteens.find(c => c.id === id)?.name || id;
 
   // ─── Render ───────────────────────────────────────────────────────────────
