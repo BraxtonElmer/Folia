@@ -5,13 +5,14 @@ All API endpoints for the Folia Campus Food Intelligence Platform.
 
 import os
 from datetime import datetime, timedelta
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
 from db import supabase_get, supabase_post, supabase_patch, supabase_delete
 from forecast_engine import forecast_engine
+from importer import process_csv
 
 load_dotenv()
 
@@ -87,6 +88,22 @@ class IngredientUpdate(BaseModel):
     qty_kg: float | None = None
     purchase_date: str | None = None
     shelf_life_days: int | None = None
+
+
+class ImportRow(BaseModel):
+    canteen_id: str
+    item_id: str
+    log_date: str
+    meal_type: str
+    prepared_qty: int
+    sold_qty: int
+    leftover_qty: int
+    weather: str = "sunny"
+    event: str = "normal"
+
+
+class ImportCommitBody(BaseModel):
+    rows: list[ImportRow]
 
 
 # ============ STARTUP ============
@@ -689,6 +706,61 @@ async def get_weekly_report(canteen_id: str):
         "worst_items": items_sorted[:5],
         "best_items": list(reversed(items_sorted[-3:])),
     }
+
+
+# ============ CSV IMPORT ============
+
+@app.post("/api/import/preview")
+async def import_preview(
+    file: UploadFile = File(...),
+    canteen_id: str = Form(...),
+):
+    """
+    Accept a CSV upload, call Gemini to detect columns, transform rows,
+    and return a preview (no DB writes). Matched items are resolved by name.
+    """
+    if not file.filename or not file.filename.lower().endswith(".csv"):
+        raise HTTPException(400, "Only .csv files are supported")
+
+    csv_bytes = await file.read()
+    if len(csv_bytes) > 10 * 1024 * 1024:  # 10 MB guard
+        raise HTTPException(413, "File too large (max 10 MB)")
+
+    items = await supabase_get("food_items", {
+        "canteen_id": f"eq.{canteen_id}",
+        "select": "id,name",
+    })
+    item_name_to_id = {item["name"]: item["id"] for item in items}
+
+    try:
+        result = await process_csv(csv_bytes, canteen_id, item_name_to_id)
+    except Exception as e:
+        raise HTTPException(500, f"Import processing failed: {e}")
+
+    return result
+
+
+@app.post("/api/import/commit")
+async def import_commit(body: ImportCommitBody):
+    """Insert the confirmed rows (already matched) into waste_logs in batches."""
+    if not body.rows:
+        raise HTTPException(400, "No rows provided")
+
+    records = [r.model_dump() for r in body.rows]
+
+    inserted = 0
+    errors: list[str] = []
+    batch_size = 200
+
+    for i in range(0, len(records), batch_size):
+        batch = records[i: i + batch_size]
+        try:
+            await supabase_post("waste_logs", batch)
+            inserted += len(batch)
+        except Exception as e:
+            errors.append(f"Batch {i // batch_size + 1}: {e}")
+
+    return {"inserted": inserted, "errors": errors}
 
 
 if __name__ == "__main__":

@@ -196,6 +196,34 @@ export async function castVoteAPI(canteenId: string, itemId: string) {
   });
 }
 
+// ============ CSV IMPORT ============
+export async function importCsvPreview(file: File, canteenId: string) {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('canteen_id', canteenId);
+  // Do NOT set Content-Type — browser sets it with the correct boundary
+  const res = await fetch(`${API_BASE}/api/import/preview`, { method: 'POST', body: formData });
+  if (!res.ok) {
+    const error = await res.text().catch(() => res.statusText);
+    throw new Error(`API ${res.status}: ${error}`);
+  }
+  return res.json() as Promise<{
+    rows: any[];
+    unmatched_items: string[];
+    errors: string[];
+    mapping: Record<string, string>;
+    defaults: Record<string, string>;
+    total_input: number;
+  }>;
+}
+
+export async function importCsvCommit(rows: any[]) {
+  return api<{ inserted: number; errors: string[] }>('/api/import/commit', {
+    method: 'POST',
+    body: JSON.stringify({ rows }),
+  });
+}
+
 // ============ CANTEENS CRUD ============
 export async function createCanteen(data: { name: string; location: string }) {
   return api<any>('/api/canteens', { method: 'POST', body: JSON.stringify(data) });

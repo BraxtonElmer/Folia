@@ -17,6 +17,7 @@ import {
   Leaf,
   Settings,
   Flame,
+  Upload,
 } from 'lucide-react';
 
 const navItems = [
@@ -31,6 +32,7 @@ const navItems = [
   { label: 'Biogas Calc', href: '/biogas', icon: Flame, section: 'Operations' },
   { label: 'Student Votes', href: '/vote', icon: Vote, section: 'Engagement' },
   { label: 'Weekly Report', href: '/report', icon: FileText, section: 'Reports' },
+  { label: 'Import CSV', href: '/import', icon: Upload, section: 'Admin' },
   { label: 'Settings', href: '/settings', icon: Settings, section: 'Admin' },
 ];
 
